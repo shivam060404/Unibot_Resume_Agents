@@ -1,0 +1,109 @@
+{
+  "basics": {
+    "name": "Alex Rivera",
+    "title": "Senior Software Engineer",
+    "email": "alex.rivera@email.com",
+    "phone": "+1-555-867-5309",
+    "location": "San Francisco, CA",
+    "links": [
+      "https://linkedin.com/in/alexrivera",
+      "https://github.com/arivera"
+    ]
+  },
+  "summary": "Senior Software Engineer with 7+ years of experience building scalable distributed systems and data pipelines. Proven track record of leading cross-functional teams to deliver mission-critical platforms serving millions of users. Deep expertise in cloud-native architecture, microservices, and real-time data processing.",
+  "experiences": [
+    {
+      "id": "exp_1",
+      "role": "Senior Software Engineer",
+      "organization": "TechCorp Inc.",
+      "location": "San Francisco, CA",
+      "start_date": "2021-03",
+      "end_date": "Present",
+      "bullets": [
+        "Architected and deployed a microservices platform handling 50M+ daily API requests with 99.95% uptime",
+        "Led migration of legacy monolith to event-driven architecture, reducing deployment time by 70%",
+        "Mentored a team of 5 junior engineers through structured code review and pair programming sessions"
+      ]
+    },
+    {
+      "id": "exp_2",
+      "role": "Software Engineer",
+      "organization": "DataFlow Systems",
+      "location": "Austin, TX",
+      "start_date": "2018-06",
+      "end_date": "2021-02",
+      "bullets": [
+        "Designed real-time data pipeline processing 2TB daily using Apache Kafka and Spark",
+        "Built automated testing framework that increased code coverage from 45% to 89%",
+        "Collaborated with product team to deliver customer-facing analytics dashboard used by 200+ enterprise clients"
+      ]
+    },
+    {
+      "id": "exp_3",
+      "role": "Junior Software Developer",
+      "organization": "StartupHub",
+      "location": "Remote",
+      "start_date": "2016-09",
+      "end_date": "2018-05",
+      "bullets": [
+        "Developed RESTful APIs serving mobile and web applications with 10K+ active users",
+        "Implemented CI/CD pipeline using Jenkins and Docker, reducing release cycles from weekly to daily"
+      ]
+    }
+  ],
+  "educations": [
+    {
+      "id": "edu_1",
+      "degree": "Master of Science",
+      "institution": "Stanford University",
+      "field_of_study": "Computer Science",
+      "start_date": "2014",
+      "end_date": "2016",
+      "details": "Specialization in Distributed Systems. Teaching Assistant for CS244b."
+    },
+    {
+      "id": "edu_2",
+      "degree": "Bachelor of Science",
+      "institution": "University of Texas at Austin",
+      "field_of_study": "Computer Engineering",
+      "start_date": "2010",
+      "end_date": "2014",
+      "details": "Dean's List. Senior capstone: IoT-based environmental monitoring system."
+    }
+  ],
+  "skills": [
+    { "id": "skill_1", "name": "Python", "category": "Programming Languages" },
+    { "id": "skill_2", "name": "Java", "category": "Programming Languages" },
+    { "id": "skill_3", "name": "TypeScript", "category": "Programming Languages" },
+    { "id": "skill_4", "name": "React", "category": "Frameworks" },
+    { "id": "skill_5", "name": "Django", "category": "Frameworks" },
+    { "id": "skill_6", "name": "Apache Kafka", "category": "Data Engineering" },
+    { "id": "skill_7", "name": "Apache Spark", "category": "Data Engineering" },
+    { "id": "skill_8", "name": "Docker", "category": "DevOps" },
+    { "id": "skill_9", "name": "Kubernetes", "category": "DevOps" },
+    { "id": "skill_10", "name": "AWS", "category": "Cloud Platforms" }
+  ],
+  "projects": [
+    {
+      "id": "proj_1",
+      "name": "Real-Time Fraud Detection Engine",
+      "description": "Built a streaming ML pipeline that detects fraudulent transactions in under 200ms using Kafka Streams and a custom anomaly detection model.",
+      "technologies": ["Python", "Kafka", "TensorFlow", "Redis"],
+      "link": "https://github.com/arivera/fraud-detection"
+    },
+    {
+      "id": "proj_2",
+      "name": "Cloud Cost Optimizer",
+      "description": "Developed an automated tool that analyzes AWS resource usage and recommends cost-saving actions, reducing cloud spend by 35% for internal teams.",
+      "technologies": ["Python", "AWS SDK", "React", "PostgreSQL"],
+      "link": "https://github.com/arivera/cloud-optimizer"
+    },
+    {
+      "id": "proj_3",
+      "name": "Developer Productivity Dashboard",
+      "description": "Created an internal dashboard aggregating GitHub, Jira, and CI/CD metrics to track team velocity and identify bottlenecks.",
+      "technologies": ["TypeScript", "Next.js", "D3.js", "GraphQL"],
+      "link": ""
+    }
+  ]
+}
