@@ -1,59 +1,130 @@
 # System Architecture: Unibot Multi-Agent Resume Co-Pilot
 
+> **Status:** ✅ End-to-end verified — fully operational on Groq via ADK-native `OpenAILlm`.
+
+---
+
 ## 1. Architectural Philosophy
-This architecture is designed to demonstrate **Enterprise-Grade GenAI Engineering**. It prioritizes deterministic state management, strict schema enforcement, and semantic agent routing over fragile heuristic logic. It leverages the Google Agent Development Kit (ADK) to build a hierarchical, fault-tolerant system.
 
-By physically separating non-deterministic LLM reasoning from deterministic JSON mutation tools, we eliminate common failure modes such as schema corruption, field hallucination, and destructive multi-section overwrites.
+This system demonstrates **Enterprise-Grade GenAI Engineering** on the Google Agent Development Kit (ADK). The core design principle is:
 
----
+> **Separate non-deterministic LLM reasoning from deterministic data mutation.**
 
-## 2. The 3-Tier Agent Topology (Least-Privilege Routing)
+LLMs are used exclusively for **semantic translation** — understanding *what* the user wants and *where* it belongs in the resume. All actual data changes are performed by **typed Python tool functions** that enforce schema contracts, execute transactionally, and return structured responses. The LLM never touches the JSON directly.
 
-The system enforces the **Principle of Least Privilege** through a strict 3-tier hierarchy. Agents are granted only the context and tools absolutely necessary for their specific domain.
-
-### Tier 1: The Conversational Gateway
-*   **Agent:** `Unibot Root Agent`
-*   **Model:** `grok-beta` (High Reasoning)
-*   **Responsibility:** Handles initial user greetings, answers general Unimad career questions, and detects when a user wants to edit their resume. 
-*   **Constraints:** It has **zero tools**. It cannot read or mutate the resume. When it detects edit intent, it immediately transfers to Tier 2.
-
-### Tier 2: The Orchestrator
-*   **Agent:** `Resume Router Agent`
-*   **Model:** `grok-beta` (High Reasoning)
-*   **Responsibility:** Translates fuzzy user requests ("update my first job") into concrete system targets. It disambiguates intent and splits multi-step requests.
-*   **Constraints:** It is strictly **Read-Only**. It has access to `get_resume` and `get_section` tools to inspect the current state, but no mutation tools. Once the target ID is resolved, it transfers to the appropriate Tier 3 agent.
-
-### Tier 3: Domain Experts (Section Agents)
-*   **Agents:** `Summary Agent`, `Experiences Agent`, `Educations Agent`, `Skills Agent`, `Projects Agent`
-*   **Model:** `grok-beta` (Low Latency, High Tool-Calling Reliability)
-*   **Responsibility:** Execute the actual edits requested by the user.
-*   **Constraints:** Extreme isolation. The `Skills Agent` only has access to `add_skill`, `remove_skill`, and `update_skill`. It cannot even *see* the tools for the Experiences section, physically preventing cross-domain hallucinations.
+This eliminates common GenAI failure modes:
+- ❌ Schema corruption from freeform LLM rewrites
+- ❌ Field hallucination (e.g., invented GPA values)
+- ❌ Cross-domain mutations (Skills agent editing Experiences)
+- ❌ Silent state corruption
 
 ---
 
-## 3. The L1 State Engine (ResumeStore)
+## 2. Model & LLM Backend
 
-To prevent the LLM from arbitrarily hallucinating JSON structures, the live state is isolated inside a singleton `ResumeStore` Python object.
+| Component | Value |
+|-----------|-------|
+| **Framework** | Google ADK |
+| **LLM Adapter** | `google.adk.labs.openai.OpenAILlm` (ADK-native, no litellm) |
+| **Backend** | [Groq](https://console.groq.com) OpenAI-compatible API |
+| **Model** | `openai/gpt-oss-20b` — supports tool calling |
+| **Client** | `openai.AsyncOpenAI(base_url="https://api.groq.com/openai/v1")` |
 
-1.  **Fail-Fast Startup:** On initialization, the system loads `resume_data/resume.json`. If the file is malformed or violates the schema, the system crashes immediately. Silent corruption is impossible.
-2.  **Anti-Aliasing:** Read tools (`get_resume`, `get_section`) return `copy.deepcopy()` representations of the state. Agents can never accidentally mutate the live memory dictionary.
-
-### Transactional Writes & Rollbacks
-Every mutation tool (e.g., `update_experience`) is wrapped in a transactional block:
-
-1.  **Snapshot:** A deep copy of the current state is saved.
-2.  **Mutate:** The specific Python tool applies the requested change to the dictionary.
-3.  **Validate:** The entire dictionary is validated against strict field whitelists and structural schemas.
-4.  **Commit/Rollback:** If validation passes, the state is committed. If the LLM passed an invalid field (e.g., trying to set `GPA` on an experience entry), the transaction rolls back, and a structured error is returned to the LLM.
+**Why no litellm?** The ADK ships with its own `OpenAILlm` adapter in `google.adk.labs.openai`. By passing a pre-configured `AsyncOpenAI` client, we route all calls through Groq without any additional dependency — keeping the dependency graph minimal and the configuration explicit.
 
 ---
 
-## 4. Self-Correcting Tool Envelopes
+## 3. The 3-Tier Agent Topology (Least-Privilege Routing)
 
-LLMs occasionally hallucinate invalid IDs or arguments. Instead of crashing the application, this architecture uses standardized Result Envelopes to enable LLM self-correction.
+The system enforces the **Principle of Least Privilege** through a strict 3-tier hierarchy. Each tier has a clearly bounded responsibility and is granted only the tools it absolutely needs.
 
-If an agent attempts: `remove_project(id="proj_99")`
-The deterministic tool catches the error and returns:
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  TIER 1 — Unibot Root Agent  (unibot_root)                       │
+│  Tools: NONE                                                      │
+│  Role: Conversational gateway. Handles greetings, career Q&A.    │
+│        Detects resume-edit intent → transfers to Tier 2.          │
+└──────────────────────────────┬───────────────────────────────────┘
+                               │ transfer_to_agent
+┌──────────────────────────────▼───────────────────────────────────┐
+│  TIER 2 — Resume Router Agent  (resume_agent)                    │
+│  Tools: get_resume, get_section  (READ-ONLY)                     │
+│  Role: Translates fuzzy NL requests into concrete system targets. │
+│        Resolves "my first job" → exp_1. Splits multi-step edits.  │
+│        Selects the correct Tier 3 agent → transfers.             │
+└──┬──────────┬───────────┬───────────┬───────────────────────────┘
+   │          │           │           │           │
+   ▼          ▼           ▼           ▼           ▼
+Summary  Experiences  Educations   Skills    Projects
+ Agent     Agent        Agent       Agent     Agent
+```
+
+### Tier 1 — Conversational Gateway
+
+- **Agent:** `unibot_root`
+- **Tools:** **None** (enforced by `tools=[]`)
+- **Responsibility:** First contact. Handles greetings and Unimad career questions. The moment it detects resume-edit intent ("update my summary", "add a skill"), it immediately calls `transfer_to_agent("resume_agent")`.
+- **Guardrail:** Cannot read or mutate the resume under any circumstances.
+
+### Tier 2 — Orchestrator / Router
+
+- **Agent:** `resume_agent`
+- **Tools:** `get_resume`, `get_section` (read-only inspection only)
+- **Responsibility:** Semantic disambiguation. Uses read tools to inspect the live resume and resolve ambiguous references (ordinals, fuzzy job title matches, "my first experience"). Identifies the target section and transfers with a resolved, concrete intent.
+- **Guardrail:** Strictly read-only. Has zero mutation tools. Cannot modify state.
+
+### Tier 3 — Domain Experts (Section Agents)
+
+Five isolated agents, each owning exactly one resume section:
+
+| Agent | Section | Mutation Tools |
+|-------|---------|---------------|
+| `summary_agent` | `summary` | `update_summary` |
+| `experiences_agent` | `experiences[]` | `update_experience`, `add_experience_bullet`, `edit_experience_bullet`, `remove_experience_bullet` |
+| `educations_agent` | `educations[]` | `update_education` |
+| `skills_agent` | `skills[]` | `add_skill`, `remove_skill`, `update_skill` |
+| `projects_agent` | `projects[]` | `add_project`, `update_project`, `remove_project` |
+
+> **Tool Scoping:** The `skills_agent` physically cannot see `add_experience_bullet`. Cross-domain mutations are architecturally impossible, not just prompt-instructed.
+
+---
+
+## 4. Transactional State Engine (ResumeStore)
+
+All live resume state is held inside a **singleton `ResumeStore`** Python object — never as a raw dictionary accessible to the LLM.
+
+### Fail-Fast Startup
+On initialization, `ResumeStore` loads `resume_data/resume.json` and validates it against the full schema. If the file is malformed or violates the schema, the process **exits immediately**. Silent corruption at startup is impossible.
+
+### Anti-Aliasing Read Layer
+`get_resume()` and `get_section()` return `copy.deepcopy()` snapshots of the internal state. Agents receive a copy, never a reference. Accidental in-memory mutation from the LLM tool layer is impossible.
+
+### Transactional Writes
+
+Every mutation tool wraps its operation in a 4-step transaction:
+
+```
+1. SNAPSHOT  →  Deep copy of current state saved to rollback buffer
+2. MUTATE    →  Python tool applies the change to the in-memory dict
+3. VALIDATE  →  Full schema validation against field whitelists
+4. COMMIT    →  If valid, changes persist
+   ROLLBACK  →  If invalid, state reverts to snapshot; error returned
+```
+
+This means the LLM can **never** leave the resume in a corrupted intermediate state.
+
+---
+
+## 5. Self-Correcting Tool Envelopes
+
+Every tool returns a standardized Result Envelope, making errors machine-readable to the LLM:
+
+**Success:**
+```json
+{ "ok": true, "data": { ... } }
+```
+
+**Failure:**
 ```json
 {
   "ok": false,
@@ -62,11 +133,63 @@ The deterministic tool catches the error and returns:
   "hint": "Valid ids: ['proj_1', 'proj_2']. Call get_section('projects') to inspect."
 }
 ```
-The LLM reads this JSON response in the ADK conversation history, realizes its mistake, calls `get_section('projects')` to find the correct ID, and tries again.
+
+The LLM reads the error in the ADK conversation history, calls `get_section('projects')` to find the correct ID, and retries — **no application crash, no user-visible failure**.
 
 ---
 
-## 5. Security & Configuration
+## 6. Prompt Architecture
 
-*   **API Key Management:** API keys are never hardcoded. The system relies on standard `.env` configuration (documented via `.env.example`), ensuring secrets are kept out of source control.
-*   **Explicit Deletions:** Destructive operations (`remove_skill`, `remove_experience_bullet`) have a mandatory Confirmation Protocol baked into the agent prompts. The LLM must explicitly ask the user "Are you sure you want to remove X?" before calling the deletion tool.
+All agent prompts follow a strict, standardized contract enforced as a template:
+
+```
+[ROLE]          — Who this agent is and what it owns
+[SCOPE]         — Exactly which section/fields it manages
+[TOOL POLICY]   — Which tools to call and when
+[EDIT POLICY]   — Anti-fabrication and anti-overwrite rules
+[GUARDRAILS]    — Explicit list of what the agent must NEVER do
+[EXAMPLES]      — Annotated few-shot examples
+```
+
+Key constraints in every section agent:
+- **Anti-Fabrication:** "Never invent metrics, percentages, or facts not provided by the user."
+- **Confirmation Protocol:** "Before calling any `remove_*` tool, you MUST confirm the exact item with the user."
+- **Scope Boundary:** "If the user requests a change outside your section, reply that you cannot help and suggest they rephrase to the main assistant."
+
+---
+
+## 7. Security & Configuration
+
+| Concern | Mitigation |
+|---------|-----------|
+| API Key exposure | Keys loaded from `.env` via `python-dotenv`; `.gitignore` excludes `.env` |
+| Source control secrets | `.env.example` with placeholder values committed; real keys never committed |
+| Destructive operations | Mandatory confirmation protocol in prompts before any `remove_*` call |
+| Schema drift | Strict Python field-whitelist validator rejects any unknown key |
+| Multi-agent confusion | Tool scoping physically isolates each agent's mutation surface |
+
+---
+
+## 8. Data Flow (End-to-End)
+
+```
+User NL Input
+     │
+     ▼
+unibot_root (Tier 1)
+  ├─ Career question?  → Answer directly
+  └─ Resume edit intent? → transfer_to_agent("resume_agent")
+         │
+         ▼
+  resume_agent (Tier 2)
+    ├─ Calls get_resume() / get_section() to inspect current state
+    ├─ Resolves target: "first experience" → exp_1
+    └─ transfer_to_agent("experiences_agent")
+              │
+              ▼
+       experiences_agent (Tier 3)
+         ├─ Calls edit_experience_bullet(id="exp_1", ...)
+         │    └─ ResumeStore: Snapshot → Mutate → Validate → Commit
+         │         └─ Returns: { "ok": true, "data": {...} }
+         └─ Confirms success to user: "Done! I've updated that bullet."
+```
