@@ -6,18 +6,29 @@ This module is the single assembly point for the full agent hierarchy:
 The root_agent is the entry point for `adk web` / `adk run`.
 """
 
+import os
+
+from dotenv import load_dotenv
+from openai import AsyncOpenAI
 from google.adk.agents import Agent
+from google.adk.labs.openai import OpenAILlm
 
 from unibot.prompts.root_prompt import ROOT_AGENT_PROMPT
 from unibot.agents.root_agent import resume_agent
 
+load_dotenv()
 
-MODEL = "gemini-3.1-pro-preview"
+# ADK-native OpenAI-compatible adapter → Groq endpoint (no litellm needed)
+_client = AsyncOpenAI(
+    api_key=os.environ["OPENAI_API_KEY"].strip(),
+    base_url=os.environ.get("OPENAI_API_BASE", "https://api.groq.com/openai/v1"),
+)
+_llm = OpenAILlm(model="openai/gpt-oss-20b", client=_client)
 
 
 root_agent = Agent(
     name="unibot_root",
-    model=MODEL,
+    model=_llm,
     instruction=ROOT_AGENT_PROMPT,
     description=(
         "Unibot — Unimad's career assistant. Greets users, answers career "

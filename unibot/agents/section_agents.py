@@ -8,7 +8,12 @@ Agent descriptions are written as routing metadata (ADK note from §2.2):
 ADK's LLM-driven transfer_to_agent selects targets from descriptions.
 """
 
+import os
+
+from dotenv import load_dotenv
+from openai import AsyncOpenAI
 from google.adk.agents import Agent
+from google.adk.labs.openai import OpenAILlm
 
 from unibot.prompts.section_prompts import (
     EDUCATIONS_AGENT_PROMPT,
@@ -29,9 +34,14 @@ from unibot.tools.education_tools import update_education
 from unibot.tools.skills_tools import add_skill, remove_skill, update_skill
 from unibot.tools.projects_tools import add_project, remove_project, update_project
 
+load_dotenv()
 
-# Model for all agents (ADR-7)
-MODEL = "gemini-3.6-flash"
+# ADK-native OpenAI-compatible adapter → Groq endpoint (no litellm needed)
+_client = AsyncOpenAI(
+    api_key=os.environ["OPENAI_API_KEY"].strip(),
+    base_url=os.environ.get("OPENAI_API_BASE", "https://api.groq.com/openai/v1"),
+)
+_llm = OpenAILlm(model="openai/gpt-oss-20b", client=_client)
 
 
 # ---------------------------------------------------------------------------
@@ -40,7 +50,7 @@ MODEL = "gemini-3.6-flash"
 
 summary_agent = Agent(
     name="summary_agent",
-    model=MODEL,
+    model=_llm,
     instruction=SUMMARY_AGENT_PROMPT,
     description=(
         "Handles requests to read, rewrite, shorten, expand, or change the tone "
@@ -57,7 +67,7 @@ summary_agent = Agent(
 
 experiences_agent = Agent(
     name="experiences_agent",
-    model=MODEL,
+    model=_llm,
     instruction=EXPERIENCES_AGENT_PROMPT,
     description=(
         "Handles requests to add, edit, or remove experience bullets, and to "
@@ -80,7 +90,7 @@ experiences_agent = Agent(
 
 educations_agent = Agent(
     name="educations_agent",
-    model=MODEL,
+    model=_llm,
     instruction=EDUCATIONS_AGENT_PROMPT,
     description=(
         "Handles requests to update education entries: degree, institution, "
@@ -96,7 +106,7 @@ educations_agent = Agent(
 
 skills_agent = Agent(
     name="skills_agent",
-    model=MODEL,
+    model=_llm,
     instruction=SKILLS_AGENT_PROMPT,
     description=(
         "Handles requests to add, remove, or recategorize skills. Transfers "
@@ -112,7 +122,7 @@ skills_agent = Agent(
 
 projects_agent = Agent(
     name="projects_agent",
-    model=MODEL,
+    model=_llm,
     instruction=PROJECTS_AGENT_PROMPT,
     description=(
         "Handles requests to add, edit, or remove projects from the portfolio "
