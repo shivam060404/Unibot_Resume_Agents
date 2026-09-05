@@ -12,7 +12,7 @@ from unibot.prompts.root_prompt import ROOT_AGENT_PROMPT
 from unibot.agents.root_agent import resume_agent
 
 
-MODEL = "gemini-1.5-pro"
+MODEL = "gemini-3.1-pro-preview"
 
 
 root_agent = Agent(

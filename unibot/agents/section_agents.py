@@ -31,7 +31,7 @@ from unibot.tools.projects_tools import add_project, remove_project, update_proj
 
 
 # Model for all agents (ADR-7)
-MODEL = "gemini-1.5-flash"
+MODEL = "gemini-3.6-flash"
 
 
 # ---------------------------------------------------------------------------

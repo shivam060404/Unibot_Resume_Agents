@@ -18,7 +18,7 @@ from unibot.agents.section_agents import (
 )
 
 
-MODEL = "gemini-1.5-pro"
+MODEL = "gemini-3.1-pro-preview"
 
 
 resume_agent = Agent(
