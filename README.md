@@ -9,7 +9,7 @@ A multi-agent resume editing system built with the Google Agent Development Kit 
    pip install -r requirements.txt
    ```
 2. Create a `.env` file in the root directory based on `.env.example`.
-3. Add your Google AI Studio API Key to the `.env` file: `GOOGLE_API_KEY=your_key`
+3. Add your xAI Grok API Key to the `.env` file: `OPENAI_API_KEY=your_key`
 4. Run the ADK web server:
    ```bash
    adk web unibot

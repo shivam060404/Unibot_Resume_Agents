@@ -13,19 +13,19 @@ The system enforces the **Principle of Least Privilege** through a strict 3-tier
 
 ### Tier 1: The Conversational Gateway
 *   **Agent:** `Unibot Root Agent`
-*   **Model:** `gemini-1.5-pro` (High Reasoning)
+*   **Model:** `grok-beta` (High Reasoning)
 *   **Responsibility:** Handles initial user greetings, answers general Unimad career questions, and detects when a user wants to edit their resume. 
 *   **Constraints:** It has **zero tools**. It cannot read or mutate the resume. When it detects edit intent, it immediately transfers to Tier 2.
 
 ### Tier 2: The Orchestrator
 *   **Agent:** `Resume Router Agent`
-*   **Model:** `gemini-1.5-pro` (High Reasoning)
+*   **Model:** `grok-beta` (High Reasoning)
 *   **Responsibility:** Translates fuzzy user requests ("update my first job") into concrete system targets. It disambiguates intent and splits multi-step requests.
 *   **Constraints:** It is strictly **Read-Only**. It has access to `get_resume` and `get_section` tools to inspect the current state, but no mutation tools. Once the target ID is resolved, it transfers to the appropriate Tier 3 agent.
 
 ### Tier 3: Domain Experts (Section Agents)
 *   **Agents:** `Summary Agent`, `Experiences Agent`, `Educations Agent`, `Skills Agent`, `Projects Agent`
-*   **Model:** `gemini-1.5-flash` (Low Latency, High Tool-Calling Reliability)
+*   **Model:** `grok-beta` (Low Latency, High Tool-Calling Reliability)
 *   **Responsibility:** Execute the actual edits requested by the user.
 *   **Constraints:** Extreme isolation. The `Skills Agent` only has access to `add_skill`, `remove_skill`, and `update_skill`. It cannot even *see* the tools for the Experiences section, physically preventing cross-domain hallucinations.
 
